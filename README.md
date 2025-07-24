@@ -171,6 +171,119 @@ We track how the curvature of the loss with respect to $\theta$ changes during t
 
 ---
 
+## 02-circuit-emergence: Circuit Emergence with Model Scaling
+
+### Goal
+This part investigates how a fixed concept (e.g., whether x % 2 == 0) becomes linearly decodable from internal activations of MLPs as the model width increases. Inspired by the “progress measures” approach to mechanistic interpretability, this LIU adapts the method to a minimal MLP setting.
+
+---
+
+### How to Run
+
+1. Set up virtual environment (if not already):
+```bash
+python3 -m venv venv
+source venv/bin/activate  # or .\venv\Scripts\activate on Windows
+pip install -r requirements.txt
+```
+
+2. Run the full pipeline (training, probing, plotting):
+```bash
+python py/02-circuit-emergence/main.py
+```
+
+- Models and checkpoints are saved in `checkpoints/`.
+- Probe results are saved in `results/`.
+- Plots are saved in `plots/`.
+
+---
+
+### Generating Plots
+- Plots of probe accuracy vs. layer for each width: `plots/probe_accuracy_vs_layer_width*.png`
+- Aggregate plot of probe accuracy vs. width: `plots/probe_accuracy_vs_width.png`
+
+---
+
+### Workflow Overview
+
+```
++-------------------+
+| dataset.py        |  -- generates modular addition dataset
++-------------------+
+           |
+           v
++-------------------+
+| train_models.py   |  -- trains MLPs of various widths
++-------------------+
+           |
+           v
++-------------------+
+| checkpoints/      |  -- stores trained models
++-------------------+
+           |
+           v
++-------------------+
+| run_probe.py      |  -- extracts activations, runs probes
++-------------------+
+           |
+           v
++-------------------+
+| results/          |  -- stores probe accuracies
++-------------------+
+           |
+           v
++-------------------+
+| plotting.py       |  -- generates probe accuracy plots
++-------------------+
+           |
+           v
++-------------------+
+| plots/            |  -- final visualizations
++-------------------+
+```
+
+---
+
+### Datacard: Modular Addition Dataset
+- Task: Predict (x + y) mod p == 0 for integers x, y in [0, p-1], p=97 (default).
+- Generation: All (x, y) pairs are created. Split into train/test by `train_frac` in `params.yaml`.
+- Inputs: 2D integer vectors (x, y).
+- Targets: Binary label (1 if x + y mod p == 0, else 0).
+- Properties: Small, synthetic, algorithmic; no noise; fixed random split.
+
+### Modelcard: MLP Architecture
+- Type: Multi-layer perceptron (MLP)
+- Input: 2D vector (x, y)
+- Output: p-way classification (for modular addition)
+- Hidden layers: Variable width (e.g., 16, 32, 64, 128, 256), fixed depth
+- Output layer: Linear, p units
+- Loss: Cross-entropy
+- Optimizer: Adam, lr configurable in `params.yaml`
+
+---
+
+### Results
+- Probe accuracies are saved for each layer and width in `results/probe_accuracies.pt`.
+- Plots show how well a concept (e.g., x % 2 == 0) can be decoded from each layer as width increases.
+- Aggregate plot shows emergence of decodability as model capacity grows.
+
+---
+
+### This is a starting point for
+- Applies probing and interpretability methods to MLPs, not just transformers.
+- Explores when and where concepts emerge as model capacity increases.
+
+---
+
+### References
+- Liu, B., Olsson, C., Hilton, J., & Ganguli, S. (2023). Progress measures for grokking via mechanistic interpretability. https://github.com/mechanistic-interpretability-grokking/progress-measures-paper
+- Elhage, N., et al. (2022). A mathematical framework for transformer circuits. https://transformer-circuits.pub/2022/framework/index.html
+- Power, A., et al. (2022). Grokking: Generalization slowly emerges during training. NeurIPS 2022. https://proceedings.neurips.cc/paper_files/paper/2022/hash/dfc310e81992d2e4cedc09ac47eff13e-Abstract-Conference.html
+- Ayyuce Kızrak (2023). Mechanistic Interpretability Projects Repository. https://github.com/ayyucekizrak/Mechanistic-Interpretability
+- Hewitt, J., & Manning, C. D. (2019). A structural probe for finding syntax in word representations. https://aclanthology.org/N19-1162
+
+---
+
 
 
 
