@@ -1,9 +1,12 @@
 # Simple MLP for modular addition
-default_hidden = 128
 import torch.nn as nn
 
+default_hidden = 128
+
+default_output_dim = 97
+
 class MLP(nn.Module):
-    def __init__(self, input_dim=2, hidden_dim=default_hidden, output_dim=97, n_hidden_layers=2):
+    def __init__(self, input_dim=2, hidden_dim=default_hidden, output_dim=default_output_dim, n_hidden_layers=2):
         super().__init__()
         # Build MLP layers
         layers = [nn.Linear(input_dim, hidden_dim), nn.ReLU()]

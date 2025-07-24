@@ -1,0 +1,10 @@
+# Set params here
+p: 97
+hidden_dim: 128
+depths: [1, 2, 3, 4, 5, 6, 7]
+n_steps: 10000
+lr: 0.001
+train_frac: 0.1
+spectrum_k: 10
+log_loss_interval: 100
+log_hessian_interval: 1000 

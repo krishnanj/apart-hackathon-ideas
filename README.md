@@ -6,12 +6,10 @@ This project studies how the sharpness of the loss landscape (measured by the to
 
 We:
 - Train MLPs of different depths on modular addition (x + y mod p)
-- Track loss, accuracy, Hessian eigenvalue, and gradient norm during training
+- Track loss, accuracy, top Hessian eigenvalue, and gradient norm during training (topmost eigenvalue is always computed)
 - Compare how these metrics change with model depth
-
+- Optionally compute the Hessian spectrum (top k eigenvalues) for small models (spectrum computation breaks for models greater than 2 or 3 layers due to memory limits)
 ---
-
-
 
 #### How to Run
 
@@ -34,6 +32,7 @@ This will train MLPs of depth 1–7 on a modular addition task and save:
 - Top Hessian eigenvalue traces
 - Gradient norm traces
 - Accuracy curves
+- (For small models) Hessian spectrum traces
 
 All plots will be saved in the plots/ directory, and intermediate results in results/.
 
@@ -69,7 +68,7 @@ Script flow:
 +-------------------+
 ```
 
-Alternatively, run everything with:
+You can run everything with:
 ```
 main.py  # runs train.py then plotting.py
 ```
@@ -85,7 +84,7 @@ main.py  # runs train.py then plotting.py
 - Targets: Integer in [0, p-1] (class index).
 - Properties: Small, synthetic, algorithmic; no noise; fixed random split.
 
-#### Modelcard: MLP Architecture
+#### Modelcard: MLP Architecture (adapted from the reference papers)
 - Type: Multi-layer perceptron (MLP)
 - Input: 2D vector (x, y)
 - Output: 97-way classification (one-hot for (x + y) mod 97)
@@ -96,7 +95,17 @@ main.py  # runs train.py then plotting.py
 
 ---
 
+#### Hessian Spectrum Computation (Important Note)
+- The script can compute the top eigenvalues (spectrum) of the Hessian for small models (e.g., hidden_dim ≤ 32 and n_layers ≤ 3).
+- For larger models, computing the full Hessian is infeasible due to memory and computational constraints (the Hessian is a very large matrix: number of parameters squared).
+- For large models, the spectrum is skipped and the plots will be empty or show a warning. This is by design to avoid crashes (SIGBUS or out-of-memory errors).
+- To see meaningful spectrum plots, set smaller values for hidden_dim and depths in params.yaml (e.g., hidden_dim: 16, depths: [1, 2, 3]).
+
+---
+
 #### Results
+
+Most, if not results below have to be run for longer training steps to probably say anything conclusive.
 
 ##### Hessian Curvature vs. Training
 - Top eigenvalues increase with model depth, suggesting deeper models enter sharper regions.
@@ -110,10 +119,6 @@ main.py  # runs train.py then plotting.py
 
 ![Train/Test Loss vs. Training Steps](py/01-grokking-hessian/plots/loss_vs_steps.png)
 
-##### Gradient Norms
-- Deeper models show noisy, unstable gradient behavior — possibly related to training instability near edge-of-stability regions.
-
-![Gradient Norm vs. Training](py/01-grokking-hessian/plots/grad_norm_vs_steps.png)
 
 ##### Test Accuracy
 - Only depth 2 consistently reaches high test accuracy.
@@ -122,6 +127,38 @@ main.py  # runs train.py then plotting.py
 ![Test Accuracy vs. Training Steps](py/01-grokking-hessian/plots/test_acc_vs_steps.png)
 
 ---
+
+#### Hessian
+
+Second-order partial derivatives of the loss function with respect to the model parameters. It measures the curvature of the loss landscape:
+
+$$
+H(\theta) = \nabla^2_{\theta} \mathcal{L}(\theta)
+$$
+
+Each entry of the Hessian is:
+
+$$
+H_{ij} = \frac{\partial^2 \mathcal{L}(\theta)}{\partial \theta_i \partial \theta_j}
+$$
+
+We compute the top eigenvalue of the Hessian to estimate how sharp the loss surface is around the current parameter vector $\theta$. A larger eigenvalue implies greater sensitivity to parameter changes.
+
+The vector $\theta$ contains all trainable parameters of the MLP — that is, the weights and biases from each linear layer:
+
+$$
+\theta = [W_1, b_1, W_2, b_2, \dots, W_n, b_n]
+$$
+
+For an MLP with depth $d$ and hidden dimension $h$, the size of $\theta$ is approximately:
+
+$$
+|\theta| = 2h + h + (d-2)(h^2 + h) + 97h + 97
+$$
+
+We track how the curvature of the loss with respect to $\theta$ changes during training and how it correlates with generalization.
+
+
 
 #### References
 
