@@ -267,6 +267,20 @@ python py/02-circuit-emergence/main.py
 - Plots show how well a concept (e.g., x % 2 == 0) can be decoded from each layer as width increases.
 - Aggregate plot shows emergence of decodability as model capacity grows.
 
+#### Probe Accuracy vs. Layer (per width)
+For each model width, the following plots show probe accuracy (decodability of the concept) at each layer:
+
+![Probe accuracy vs. layer, width=16](py/02-circuit-emergence/plots/probe_accuracy_vs_layer_width16.png)
+![Probe accuracy vs. layer, width=32](py/02-circuit-emergence/plots/probe_accuracy_vs_layer_width32.png)
+![Probe accuracy vs. layer, width=64](py/02-circuit-emergence/plots/probe_accuracy_vs_layer_width64.png)
+![Probe accuracy vs. layer, width=128](py/02-circuit-emergence/plots/probe_accuracy_vs_layer_width128.png)
+![Probe accuracy vs. layer, width=256](py/02-circuit-emergence/plots/probe_accuracy_vs_layer_width256.png)
+
+#### Aggregate: Probe Accuracy vs. Width
+This plot shows how probe accuracy for each layer changes as model width increases:
+
+![Aggregate probe accuracy vs. width](py/02-circuit-emergence/plots/probe_accuracy_vs_width.png)
+
 ---
 
 ### This is a starting point for
