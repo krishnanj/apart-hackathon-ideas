@@ -79,7 +79,7 @@ main.py  # runs train.py then plotting.py
 ---
 
 #### Datacard: Modular Addition Dataset
-- Task: Predict (x + y) mod p for integers x, y in [0, p-1], p=97.
+- Task: Predict (x + y) mod p for integers x, y in [0, p-1], p=97 (used in the reference papers).
 - Generation: All (x, y) pairs are created. 10% are randomly selected for training, the rest for testing.
 - Inputs: 2D integer vectors (x, y).
 - Targets: Integer in [0, p-1] (class index).
