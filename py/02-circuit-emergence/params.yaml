@@ -1,0 +1,8 @@
+p: 97
+train_frac: 0.8
+seed: 42
+widths: [16, 32, 64, 128, 256]
+depth: 2
+lr: 0.001
+steps: 5000
+concept: "x_mod_2"
