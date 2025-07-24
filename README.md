@@ -117,30 +117,29 @@ main.py  # runs train.py then plotting.py
 - However, deeper models (depth >= 4) do not necessarily grok — they show high curvature without generalization.
 
 ![Hessian curvature vs. training](py/01-grokking-hessian/plots/hessian_vs_depth.png)
-Figure: Top Hessian eigenvalue vs. training steps for different model depths.
 
 ##### Loss vs. Steps
-- Shallower models (depth 2–3) successfully transition from memorization to generalization (classic grokking curve).
-- Deeper models either overfit or plateau at high test loss.
+- Shallower models (depth 2–3) show a clear transition in test loss from memorization to generalization (classic grokking curve).
+- Deeper models (depth >= 4) either overfit or plateau at high test loss; their test loss does not decrease significantly.
 
 ![Train/Test Loss vs. Training Steps](py/01-grokking-hessian/plots/loss_vs_steps.png)
-Figure: Train and test loss (log scale) vs. training steps for different model depths.
 
 ##### Gradient Norms
 - Deeper models show noisy, unstable gradient behavior — possibly related to training instability near edge-of-stability regions.
 
 ![Gradient Norm vs. Training](py/01-grokking-hessian/plots/grad_norm_vs_steps.png)
-Figure: Gradient norm vs. training steps for different model depths.
 
 ##### Test Accuracy
 - Only depth 2 consistently reaches high test accuracy.
-- Generalization does not monotonically improve with depth.
+- Generalization (test accuracy) does not monotonically improve with depth; deeper models do not generalize well.
 
 ![Test Accuracy vs. Training Steps](py/01-grokking-hessian/plots/test_acc_vs_steps.png)
-Figure: Test accuracy vs. training steps for different model depths.
 
 ---
 
 Note:
 - You can run python plotting.py separately to regenerate plots from existing results.
 - Adjust model/training parameters in train.py as needed for further experiments.
+
+
+
