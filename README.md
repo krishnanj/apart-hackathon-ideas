@@ -1,14 +1,6 @@
-# Apart Hackathon Ideas
+# Apart Hackathon Projects
 
-## Useful Repo Links
-
- * [openai/grok](https://github.com/openai/grok)
-
----
-
-## Projects
-
-### 01-grokking-hessian
+## 01-grokking-hessian
 
 This project studies how the sharpness of the loss landscape (measured by the top Hessian eigenvalue) changes during training on a modular addition task, and how this depends on model depth.
 
@@ -19,15 +11,7 @@ We:
 
 ---
 
-#### References
 
-- Grokking: "Learning Algorithmic Tasks by Tuning Gradient Descent"
-  [NeurIPS 2022 Paper](https://proceedings.neurips.cc/paper_files/paper/2022/hash/dfc310e81992d2e4cedc09ac47eff13e-Abstract-Conference.html)
-- Base implementation: https://github.com/teddykoker/grokking
-- Sharpness analysis inspiration: https://github.com/LucasPrietoAl/grokking-at-the-edge-of-numerical-stability
-- Hessian top eigenvalue computation: custom autograd implementation (similar to PyHessian/BackPACK)
-
----
 
 #### How to Run
 
@@ -89,6 +73,8 @@ Alternatively, run everything with:
 ```
 main.py  # runs train.py then plotting.py
 ```
+- You can run python plotting.py separately to regenerate plots from existing results.
+- Adjust model/training parameters in train.py as needed for further experiments.
 
 ---
 
@@ -137,9 +123,18 @@ main.py  # runs train.py then plotting.py
 
 ---
 
-Note:
-- You can run python plotting.py separately to regenerate plots from existing results.
-- Adjust model/training parameters in train.py as needed for further experiments.
+#### References
+
+- Grokking: "Learning Algorithmic Tasks by Tuning Gradient Descent"
+  [NeurIPS 2022 Paper](https://proceedings.neurips.cc/paper_files/paper/2022/hash/dfc310e81992d2e4cedc09ac47eff13e-Abstract-Conference.html)
+- Base implementation: https://github.com/teddykoker/grokking
+- Sharpness analysis inspiration: https://github.com/LucasPrietoAl/grokking-at-the-edge-of-numerical-stability
+- Hessian top eigenvalue computation: custom autograd implementation (similar to PyHessian/BackPACK)
+- [openai/grok](https://github.com/openai/grok)
+
+---
+
+
 
 
 
