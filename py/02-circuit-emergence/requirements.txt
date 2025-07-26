@@ -1,0 +1,5 @@
+torch>=2.0.0
+matplotlib
+numpy
+pyyaml
+scikit-learn>=1.0.0 

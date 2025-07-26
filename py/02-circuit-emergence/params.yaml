@@ -5,4 +5,26 @@ widths: [16, 32, 64, 128, 256]
 depth: 2
 lr: 0.001
 steps: 5000
-concept: "x_mod_2"
+concept: "x_equals_y"  # Changed to x_equals_y for 2D symmetric functions
+
+# Enable synthetic functions
+use_synthetic: true  # Set to true to use synthetic functions instead of modular addition
+use_composite: true  # Set to true to use composite functions f(g(x))
+
+# Synthetic function parameters
+func_type: "symmetric"  # Changed from relu_tree to symmetric
+complexity: 3  # not used for symmetric functions but kept for consistency
+input_range: [-5, 5]
+n_samples: 1000
+
+# Composite function parameters
+inner_func: "poly"  # poly, sin, relu
+outer_func: "sin"  # poly, sin, relu
+
+# Probe configuration
+probe_mode: "all"  # "all", "single", or "custom"
+probe_type: "linear"  # linear, tree, svm, mlp (used when probe_mode is "single")
+custom_probes: ["linear", "tree", "svm"]  # used when probe_mode is "custom"
+
+# Symmetry test parameters
+symmetry_test_samples: 500

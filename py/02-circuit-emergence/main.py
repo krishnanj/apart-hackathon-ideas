@@ -10,4 +10,9 @@ if __name__ == "__main__":
     subprocess.run([sys.executable, os.path.join(here, "run_probe.py")], check=True)
     print("[main] Plotting probe results...")
     subprocess.run([sys.executable, os.path.join(here, "plotting.py")], check=True)
-    print("[main] All done.") 
+    print("[main] All done.")
+
+# Add to main.py after the existing pipeline
+if params.get("run_symmetry_analysis", False):
+    print("Running symmetry analysis...")
+    subprocess.run([venv_python, "symmetry_analysis.py"], cwd=here)
