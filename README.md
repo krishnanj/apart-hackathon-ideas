@@ -1,4 +1,5 @@
-# Circuit Emergence in Neural Networks
+# Layerwise Development of Compositional Functional Representations Across Architectures
+
 
 This repository investigates how concepts emerge and become linearly decodable from internal activations as neural networks scale in capacity. We study both Multi-Layer Perceptrons (MLPs) and Transformer architectures to understand how circuit emergence differs between architectures.
 
