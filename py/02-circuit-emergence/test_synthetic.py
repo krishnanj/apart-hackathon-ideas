@@ -31,16 +31,27 @@ def test_dataset_creation():
     """Test dataset creation with parameters"""
     print("\nTesting dataset creation...")
     
-    # Test modular addition
-    params = {"use_synthetic": False, "p": 97, "train_frac": 0.8, "seed": 42}
+    # Test modular addition (MLP format)
+    params = {"use_synthetic": False, "p": 97, "train_frac": 0.8, "seed": 42, "architecture": "mlp"}
     train_x, train_y, test_x, test_y = create_dataset_from_params(params)
-    print(f"✓ Modular addition: train {train_x.shape}, test {test_x.shape}")
+    print(f"✓ Modular addition (MLP): train {train_x.shape}, test {test_x.shape}")
     
-    # Test synthetic polynomial
-    params = {"use_synthetic": True, "func_type": "polynomial", "complexity": 3, 
-              "train_frac": 0.8, "seed": 42}
+    # Test modular addition (Transformer format)
+    params = {"use_synthetic": False, "p": 97, "train_frac": 0.8, "seed": 42, "architecture": "transformer"}
     train_x, train_y, test_x, test_y = create_dataset_from_params(params)
-    print(f"✓ Synthetic polynomial: train {train_x.shape}, test {test_x.shape}")
+    print(f"✓ Modular addition (Transformer): train {train_x.shape}, test {test_x.shape}")
+    
+    # Test synthetic polynomial (MLP format)
+    params = {"use_synthetic": True, "func_type": "polynomial", "complexity": 3, 
+              "train_frac": 0.8, "seed": 42, "architecture": "mlp"}
+    train_x, train_y, test_x, test_y = create_dataset_from_params(params)
+    print(f"✓ Synthetic polynomial (MLP): train {train_x.shape}, test {test_x.shape}")
+    
+    # Test synthetic polynomial (Transformer format)
+    params = {"use_synthetic": True, "func_type": "polynomial", "complexity": 3, 
+              "train_frac": 0.8, "seed": 42, "architecture": "transformer"}
+    train_x, train_y, test_x, test_y = create_dataset_from_params(params)
+    print(f"✓ Synthetic polynomial (Transformer): train {train_x.shape}, test {test_x.shape}")
 
 def test_function_visualization():
     """Create a simple visualization of synthetic functions"""

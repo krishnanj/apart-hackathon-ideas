@@ -5,6 +5,13 @@ from sklearn.metrics import accuracy_score
 import numpy as np
 import os
 
+# Import transformer support if available
+try:
+    from transformer_probe_utils import TransformerProbeAnalyzer
+    TRANSFORMER_SUPPORT = True
+except ImportError:
+    TRANSFORMER_SUPPORT = False
+
 def register_hooks(model, layer_indices, activation_store):
     hooks = []
     for idx in layer_indices:
@@ -28,6 +35,24 @@ def run_probe(activation_store, concept_labels):
         acc = clf.score(X, y)
         accs.append(acc)
     return accs
+
+def register_transformer_hooks(model, activation_store, attention_store=None):
+    """Register hooks for transformer model (if transformer support is available)."""
+    if not TRANSFORMER_SUPPORT:
+        print("Warning: Transformer support not available")
+        return []
+    
+    transformer_analyzer = TransformerProbeAnalyzer()
+    return transformer_analyzer.register_transformer_hooks(model, activation_store, attention_store)
+
+def register_architecture_hooks(model, layer_indices, activation_store, params, attention_store=None):
+    """Register hooks based on architecture type."""
+    architecture = params.get('architecture', 'mlp')
+    
+    if architecture == 'transformer':
+        return register_transformer_hooks(model, activation_store, attention_store)
+    else:
+        return register_hooks(model, layer_indices, activation_store)
 
 def save_dict_as_pt(dict_obj, filepath):
     os.makedirs(os.path.dirname(filepath), exist_ok=True)

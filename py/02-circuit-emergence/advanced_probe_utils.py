@@ -8,6 +8,14 @@ from sklearn.metrics import accuracy_score, r2_score
 import warnings
 warnings.filterwarnings('ignore')
 
+# Import transformer-specific utilities
+try:
+    from transformer_probe_utils import TransformerProbeAnalyzer
+    TRANSFORMER_SUPPORT = True
+except ImportError:
+    TRANSFORMER_SUPPORT = False
+    print("Warning: transformer_probe_utils not found. Transformer support disabled.")
+
 class MultiProbeAnalyzer:
     """Analyzer that can run multiple types of probes on layer activations."""
     
@@ -79,6 +87,39 @@ class MultiProbeAnalyzer:
             results[layer] = layer_results
         
         return results
+    
+    def run_transformer_probes(self, model, test_x, concept_labels, is_regression=False, attention_analysis=True):
+        """Run probes on transformer model with attention analysis."""
+        if not TRANSFORMER_SUPPORT:
+            print("Error: Transformer support not available")
+            return {}
+        
+        # Create transformer-specific analyzer
+        transformer_analyzer = TransformerProbeAnalyzer(self.probe_types)
+        
+        # Register hooks for transformer
+        activation_store = {}
+        attention_store = {} if attention_analysis else None
+        
+        hooks = transformer_analyzer.register_transformer_hooks(model, activation_store, attention_store)
+        
+        # Run forward pass
+        with torch.no_grad():
+            model(test_x)
+        
+        # Remove hooks
+        for hook in hooks:
+            hook.remove()
+        
+        # Run probes
+        probe_results = transformer_analyzer.run_transformer_probes(activation_store, concept_labels, is_regression)
+        
+        # Add attention analysis if requested
+        if attention_analysis and attention_store:
+            attention_results = transformer_analyzer.analyze_attention_patterns(attention_store, test_x, concept_labels, {})
+            probe_results['attention_analysis'] = attention_results
+        
+        return probe_results
 
 def run_single_probe(activation_store, concept_labels, probe_type="linear", is_regression=False):
     """Run a single probe type (backward compatibility)."""
@@ -129,4 +170,38 @@ def symmetry_probe(activation_store, input_pairs):
         else:
             symmetry_scores[layer] = float('nan')
     
-    return symmetry_scores 
+    return symmetry_scores
+
+def run_unified_probes(model, test_x, concept_labels, params, is_regression=False):
+    """Unified probe function that works with both MLP and transformer architectures."""
+    architecture = params.get('architecture', 'mlp')
+    probe_types = params.get('custom_probes', ['linear', 'tree', 'svm'])
+    
+    analyzer = MultiProbeAnalyzer(probe_types)
+    
+    if architecture == 'transformer':
+        # Use transformer-specific probing
+        return analyzer.run_transformer_probes(model, test_x, concept_labels, is_regression)
+    else:
+        # Use traditional MLP probing
+        # This requires activation_store from register_hooks
+        # For now, return a placeholder - this should be called with pre-captured activations
+        print("Warning: MLP probing requires pre-captured activations")
+        return {}
+
+def run_architecture_aware_probes(model, test_x, concept_labels, params, activation_store=None, is_regression=False):
+    """Run probes with automatic architecture detection and appropriate method."""
+    architecture = params.get('architecture', 'mlp')
+    probe_types = params.get('custom_probes', ['linear', 'tree', 'svm'])
+    
+    analyzer = MultiProbeAnalyzer(probe_types)
+    
+    if architecture == 'transformer':
+        # Transformer probing
+        return analyzer.run_transformer_probes(model, test_x, concept_labels, is_regression)
+    else:
+        # MLP probing (requires activation_store)
+        if activation_store is None:
+            print("Error: activation_store required for MLP probing")
+            return {}
+        return analyzer.run_probes(activation_store, concept_labels, is_regression) 

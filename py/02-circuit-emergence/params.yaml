@@ -9,7 +9,7 @@ concept: "x_equals_y"
 
 # Enable synthetic functions
 use_synthetic: true
-use_composite: true  # Enable composite functions f(g(x))
+use_composite: false  # Changed to false for testing
 
 # Synthetic function parameters
 func_type: "trigonometric"  # Keep trigonometric for complexity
@@ -39,3 +39,16 @@ emergence_threshold: 0.8
 phase_detection: true
 complexity_widths: [16, 32, 64]  # Smaller widths
 complexity_depth: 3  # Fewer layers
+
+# Architecture settings
+architecture: "transformer"  # Changed to transformer for testing
+transformer_config:
+  dim: 128
+  num_layers: 2
+  num_heads: 4
+  seq_len: 5
+  num_tokens: 100  # Will be set dynamically based on task
+
+# Training parameters
+n_epochs: 50  # Reduced for testing
+batch_size: 32

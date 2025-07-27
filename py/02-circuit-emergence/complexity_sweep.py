@@ -14,8 +14,8 @@ import yaml
 
 from model import create_model_from_params
 from dataset import create_dataset_from_params
-from probe_utils import register_hooks, save_dict_as_pt
-from advanced_probe_utils import MultiProbeAnalyzer
+from probe_utils import register_hooks, register_architecture_hooks, save_dict_as_pt
+from advanced_probe_utils import MultiProbeAnalyzer, run_architecture_aware_probes
 from load_params import load_params
 
 def run_complexity_sweep():
@@ -55,21 +55,41 @@ def run_complexity_sweep():
             
             # Determine input/output dimensions from data
             input_dim = train_x.shape[1]
-            output_dim = train_y.shape[1]
+            # Handle both 1D and 2D output tensors
+            if len(train_y.shape) > 1:
+                output_dim = train_y.shape[1]
+            else:
+                # For 1D tensors (like transformer labels), use the number of unique values
+                output_dim = len(torch.unique(train_y))
             
             print(f"    Input shape: {train_x.shape}, Output shape: {train_y.shape}")
             
             # Create model with correct dimensions
-            model = create_model_from_params(params, input_dim=input_dim, output_dim=output_dim)
+            model = create_model_from_params(input_dim, output_dim, params)
             
             # Train model
             optimizer = torch.optim.Adam(model.parameters(), lr=params['lr'])
-            criterion = torch.nn.MSELoss()
+            
+            # Choose appropriate loss function based on architecture
+            architecture = params.get('architecture', 'mlp')
+            if architecture == 'transformer':
+                criterion = torch.nn.CrossEntropyLoss()
+            else:
+                criterion = torch.nn.MSELoss()
             
             for step in range(params['steps']):
                 optimizer.zero_grad()
                 outputs = model(train_x)
-                loss = criterion(outputs, train_y)
+                
+                if architecture == 'transformer':
+                    # For transformer, we predict the last token
+                    # outputs shape: [batch_size, seq_len, num_tokens]
+                    # We want to predict the last token, so take outputs[:, -1, :]
+                    last_token_outputs = outputs[:, -1, :]  # [batch_size, num_tokens]
+                    loss = criterion(last_token_outputs, train_y.long())
+                else:
+                    loss = criterion(outputs, train_y)
+                
                 loss.backward()
                 optimizer.step()
                 
@@ -98,24 +118,12 @@ def run_complexity_sweep():
 
 def run_composite_probes_on_model(model, test_x, test_g, test_fg, params):
     """Run probes for composite functions - probe both g(x) and f(g(x))"""
-    # Get activations using the correct hook registration
-    activations = {}
-    depth = params.get('complexity_depth', 5)
-    layer_indices = list(range(depth))  # Register hooks for all layers
-    
-    hooks = register_hooks(model, layer_indices, activations)
-    
-    with torch.no_grad():
-        model(test_x)
-    
-    # Remove hooks
-    for hook in hooks:
-        hook.remove()
+    architecture = params.get('architecture', 'mlp')
     
     # Convert tensors to numpy
-    x_vals = test_x[:, 0].numpy()
-    g_vals = test_g[:, 0].numpy()
-    fg_vals = test_fg[:, 0].numpy()
+    x_vals = test_x[:, 0].numpy() if len(test_x.shape) > 1 else test_x.numpy()
+    g_vals = test_g[:, 0].numpy() if len(test_g.shape) > 1 else test_g.numpy()
+    fg_vals = test_fg[:, 0].numpy() if len(test_fg.shape) > 1 else test_fg.numpy()
     
     # Create concepts for both g(x) and f(g(x))
     g_concept = generate_hard_concept(g_vals)
@@ -124,66 +132,102 @@ def run_composite_probes_on_model(model, test_x, test_g, test_fg, params):
     print(f"    g(x) concept distribution: {dict(zip(*np.unique(g_concept, return_counts=True)))}")
     print(f"    f(g(x)) concept distribution: {dict(zip(*np.unique(fg_concept, return_counts=True)))}")
     
-    # Run probes for both concepts
-    probe_analyzer = MultiProbeAnalyzer(["linear"])
-    g_results = probe_analyzer.run_probes(activations, g_concept, is_regression=False)
-    fg_results = probe_analyzer.run_probes(activations, fg_concept, is_regression=False)
+    if architecture == 'transformer':
+        # Use transformer-specific probing for both concepts
+        g_results = run_architecture_aware_probes(
+            model, test_x, g_concept, params, is_regression=False
+        )
+        fg_results = run_architecture_aware_probes(
+            model, test_x, fg_concept, params, is_regression=False
+        )
+    else:
+        # Use MLP probing with activation capture
+        activations = {}
+        depth = params.get('complexity_depth', 5)
+        layer_indices = list(range(depth))
+        
+        hooks = register_architecture_hooks(model, layer_indices, activations, params)
+        
+        with torch.no_grad():
+            model(test_x)
+        
+        for hook in hooks:
+            hook.remove()
+        
+        g_results = run_architecture_aware_probes(
+            model, test_x, g_concept, params, 
+            activation_store=activations, is_regression=False
+        )
+        fg_results = run_architecture_aware_probes(
+            model, test_x, fg_concept, params, 
+            activation_store=activations, is_regression=False
+        )
     
     # Combine results - extract linear probe accuracies
     combined_results = {}
-    for layer in g_results:
-        # Extract linear probe accuracy from nested dictionary
-        g_linear_acc = g_results[layer]['linear']
-        fg_linear_acc = fg_results[layer]['linear']
-        
-        combined_results[f"g_layer_{layer}"] = g_linear_acc
-        combined_results[f"fg_layer_{layer}"] = fg_linear_acc
+    for layer_name in g_results.keys():
+        if isinstance(g_results[layer_name], dict) and 'linear' in g_results[layer_name]:
+            g_linear_acc = g_results[layer_name]['linear']
+            fg_linear_acc = fg_results[layer_name]['linear']
+            
+            combined_results[f"g_{layer_name}"] = g_linear_acc
+            combined_results[f"fg_{layer_name}"] = fg_linear_acc
     
     # Debug: Print sample probe results
-    for layer in g_results:
-        g_acc = g_results[layer]['linear']
-        fg_acc = fg_results[layer]['linear']
-        print(f"    Layer {layer} g(x) probe accuracy: {g_acc:.4f}")
-        print(f"    Layer {layer} f(g(x)) probe accuracy: {fg_acc:.4f}")
+    for layer_name in list(g_results.keys())[:3]:  # Show first 3
+        if isinstance(g_results[layer_name], dict) and 'linear' in g_results[layer_name]:
+            g_acc = g_results[layer_name]['linear']
+            fg_acc = fg_results[layer_name]['linear']
+            print(f"    {layer_name} g(x) probe accuracy: {g_acc:.4f}")
+            print(f"    {layer_name} f(g(x)) probe accuracy: {fg_acc:.4f}")
     
     return combined_results
 
 def run_probes_on_model(model, test_x, test_y, params):
-    """Run probes with much harder concept detection"""
-    # Get activations using the correct hook registration
-    activations = {}
-    depth = params.get('complexity_depth', 5)
-    layer_indices = list(range(depth))  # Register hooks for all layers
-    
-    hooks = register_hooks(model, layer_indices, activations)
-    
-    with torch.no_grad():
-        model(test_x)
-    
-    # Remove hooks
-    for hook in hooks:
-        hook.remove()
+    """Run probes with architecture-aware system"""
+    architecture = params.get('architecture', 'mlp')
     
     # Convert tensors to numpy
-    x_vals = test_x[:, 0].numpy()
-    y_vals = test_y[:, 0].numpy()
+    x_vals = test_x[:, 0].numpy() if len(test_x.shape) > 1 else test_x.numpy()
+    y_vals = test_y[:, 0].numpy() if len(test_y.shape) > 1 else test_y.numpy()
     
     # Generate hard concept
     concept_labels = generate_hard_concept(y_vals)
     print(f"    Concept distribution: {dict(zip(*np.unique(concept_labels, return_counts=True)))}")
     
-    # Run probes using linear probes only
-    probe_analyzer = MultiProbeAnalyzer(["linear"])
-    probe_results = probe_analyzer.run_probes(activations, concept_labels, is_regression=False)
+    if architecture == 'transformer':
+        # Use transformer-specific probing
+        probe_results = run_architecture_aware_probes(
+            model, test_x, concept_labels, params, is_regression=False
+        )
+    else:
+        # Use MLP probing with activation capture
+        activations = {}
+        depth = params.get('complexity_depth', 5)
+        layer_indices = list(range(depth))
+        
+        hooks = register_architecture_hooks(model, layer_indices, activations, params)
+        
+        with torch.no_grad():
+            model(test_x)
+        
+        for hook in hooks:
+            hook.remove()
+        
+        probe_results = run_architecture_aware_probes(
+            model, test_x, concept_labels, params, 
+            activation_store=activations, is_regression=False
+        )
     
     # Extract linear probe accuracies from nested dictionary
     linear_results = {}
-    for layer in probe_results:
-        linear_results[layer] = probe_results[layer]['linear']
+    for layer_name, results in probe_results.items():
+        if isinstance(results, dict) and 'linear' in results:
+            linear_results[layer_name] = results['linear']
     
     # Debug: Print sample probe results
-    for layer in linear_results:
-        print(f"    Layer {layer} linear probe accuracy: {linear_results[layer]:.4f}")
+    for layer_name in list(linear_results.keys())[:3]:  # Show first 3
+        print(f"    {layer_name} linear probe accuracy: {linear_results[layer_name]:.4f}")
     
     return linear_results
 
@@ -291,7 +335,21 @@ def create_regular_plots(results, timestamp):
     complexities = sorted(results.keys())
     widths = list(results[complexities[0]].keys())
     layers = [key for key in results[complexities[0]][widths[0]].keys() if 'layer' in key]
-    layers = sorted(layers, key=lambda x: int(x.split('_')[-1]))
+    
+    # Sort layers by extracting layer number, handling both MLP and transformer naming
+    def get_layer_number(layer_name):
+        parts = layer_name.split('_')
+        # For transformer: layer_0_ln1 -> extract 0
+        # For MLP: layer_0 -> extract 0
+        for i, part in enumerate(parts):
+            if part == 'layer' and i + 1 < len(parts):
+                try:
+                    return int(parts[i + 1])
+                except ValueError:
+                    continue
+        return 0  # fallback
+    
+    layers = sorted(layers, key=get_layer_number)
     
     # Create emergence plot
     plt.figure(figsize=(12, 8))
@@ -299,7 +357,9 @@ def create_regular_plots(results, timestamp):
         plt.subplot(2, 2, i+1)
         for layer in layers:
             accuracies = [results[c][width][layer] for c in complexities]
-            plt.plot(complexities, accuracies, marker='o', label=f'Layer {layer.split("_")[-1]}')
+            # Extract layer number for label
+            layer_num = get_layer_number(layer)
+            plt.plot(complexities, accuracies, marker='o', label=f'Layer {layer_num}')
         plt.xlabel('Complexity')
         plt.ylabel('Probe Accuracy')
         plt.title(f'Width {width}')
@@ -321,7 +381,7 @@ def create_regular_plots(results, timestamp):
         plt.ylabel('Layer')
         plt.title(f'Width {width}')
         plt.xticks(range(len(complexities)), complexities)
-        plt.yticks(range(len(layers)), [layer.split('_')[-1] for layer in layers])
+        plt.yticks(range(len(layers)), [get_layer_number(layer) for layer in layers])
     
     plt.tight_layout()
     plt.savefig(f'plots/complexity_heatmap_{timestamp}.png', dpi=300, bbox_inches='tight')

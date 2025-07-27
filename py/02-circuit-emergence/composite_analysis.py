@@ -12,9 +12,24 @@ import os
 
 from model import create_model_from_params
 from dataset import create_dataset_from_params
-from probe_utils import register_hooks, save_dict_as_pt
-from advanced_probe_utils import MultiProbeAnalyzer
+from probe_utils import register_hooks, register_architecture_hooks, save_dict_as_pt
+from advanced_probe_utils import MultiProbeAnalyzer, run_architecture_aware_probes
 from load_params import load_params
+
+def generate_hard_concept(y_vals):
+    """Generate hard concept labels for probing"""
+    # Convert to numpy if needed
+    if hasattr(y_vals, 'numpy'):
+        y_vals = y_vals.numpy()
+    
+    # Flatten if needed
+    if len(y_vals.shape) > 1:
+        y_vals = y_vals.flatten()
+    
+    # Create concept based on value ranges
+    concept = np.zeros(len(y_vals), dtype=int)
+    concept[y_vals > np.median(y_vals)] = 1
+    return concept
 
 def run_composite_analysis(inner_func="poly", outer_func="sin"):
     """Run composite function analysis with dual probing for specific function combination"""
@@ -24,6 +39,11 @@ def run_composite_analysis(inner_func="poly", outer_func="sin"):
     params["use_composite"] = True
     params["inner_func"] = inner_func
     params["outer_func"] = outer_func
+    
+    # Force transformer architecture for composite functions
+    # This ensures proper sequence format conversion
+    params["architecture"] = "transformer"
+    architecture = "transformer"
     
     # Load parameters
     widths = params["widths"]
@@ -49,26 +69,50 @@ def run_composite_analysis(inner_func="poly", outer_func="sin"):
     
     # Train models
     print(f"\nTraining models for {inner_func} -> {outer_func}...")
-    train_x = train_x.float().to(device)
-    train_f_gx = train_f_gx.float().to(device)  # Train on f(g(x))
+    if architecture == 'transformer':
+        train_x = train_x.long().to(device)  # Keep as integers for transformer
+        train_f_gx = train_f_gx.long().to(device)  # Keep as integers for transformer
+    else:
+        train_x = train_x.float().to(device)
+        train_f_gx = train_f_gx.float().to(device)  # Train on f(g(x))
     
     for w in widths:
         print(f"Training model with width {w}...")
         
         # Create model
         input_dim = train_x.shape[1]
-        output_dim = train_f_gx.shape[1] if len(train_f_gx.shape) > 1 else 1
-        model = create_model_from_params(params, input_dim=input_dim, output_dim=output_dim).to(device)
+        
+        if architecture == 'transformer':
+            # For transformer, use number of unique values as output dimension
+            output_dim = len(torch.unique(train_f_gx))
+        else:
+            output_dim = train_f_gx.shape[1] if len(train_f_gx.shape) > 1 else 1
+        
+        model = create_model_from_params(input_dim, output_dim, params).to(device)
         
         # Train on f(g(x))
         opt = torch.optim.Adam(model.parameters(), lr=params["lr"])
         
+        # Choose appropriate loss function
+        if architecture == 'transformer':
+            criterion = torch.nn.CrossEntropyLoss()
+        else:
+            criterion = torch.nn.MSELoss()
+        
         for step in range(params["steps"]):
             logits = model(train_x)
             
-            if output_dim == 1:
-                logits = logits.squeeze(-1)
-            loss = torch.nn.functional.mse_loss(logits, train_f_gx.squeeze(-1))
+            if architecture == 'transformer':
+                # For transformer, predict the last token
+                last_token_outputs = logits[:, -1, :]  # [batch_size, num_tokens]
+                # For composite functions, target is the last token of each sequence
+                targets = train_f_gx[:, -1].long()  # Extract last token as target
+                loss = criterion(last_token_outputs, targets)
+            else:
+                # For MLP
+                if output_dim == 1:
+                    logits = logits.squeeze(-1)
+                loss = criterion(logits, train_f_gx.squeeze(-1))
             
             opt.zero_grad()
             loss.backward()
@@ -94,7 +138,14 @@ def run_composite_analysis(inner_func="poly", outer_func="sin"):
         print(f"Analyzing model with width {w}...")
         
         # Load model
-        model = create_model_from_params(params, input_dim=test_x.shape[1], output_dim=1).to(device)
+        input_dim = test_x.shape[1]
+        
+        if architecture == 'transformer':
+            output_dim = len(torch.unique(test_f_gx))
+        else:
+            output_dim = 1
+        
+        model = create_model_from_params(input_dim, output_dim, params).to(device)
         checkpoint_files = [f for f in os.listdir("checkpoints") 
                           if f.startswith(f"{func_prefix}_width{w}_") and f.endswith(".pt")]
         
@@ -107,24 +158,65 @@ def run_composite_analysis(inner_func="poly", outer_func="sin"):
         model.load_state_dict(torch.load(ckpt_path))
         model.eval()
         
-        # Get activations
-        activation_store = {}
-        hooks = register_hooks(model, layer_indices=list(range(depth + 1)), activation_store=activation_store)
+        # Generate concept labels for probing
+        g_concept = generate_hard_concept(test_g_x.numpy())
+        fg_concept = generate_hard_concept(test_f_gx.numpy())
         
-        with torch.no_grad():
-            _ = model(test_x.float().to(device))
+        # For transformer, we need to reshape labels to match sequence format
+        if architecture == 'transformer':
+            batch_size = test_x.shape[0]
+            seq_len = test_x.shape[1]
+            # Reshape to match flattened activations: [batch_size * seq_len]
+            g_concept = g_concept.reshape(batch_size, 1).repeat(1, seq_len).flatten()
+            fg_concept = fg_concept.reshape(batch_size, 1).repeat(1, seq_len).flatten()
         
-        # Dual probing: g(x) vs f(g(x))
         print(f"  Probing for g(x) concept...")
-        g_results = analyzer.run_probes(activation_store, test_g_x, is_regression=True)
+        if architecture == 'transformer':
+            # Use transformer-specific probing
+            g_results = run_architecture_aware_probes(
+                model, test_x, g_concept, params, is_regression=False
+            )
+        else:
+            # Use MLP probing with activation capture
+            activation_store = {}
+            hooks = register_architecture_hooks(model, list(range(depth + 1)), activation_store, params)
+            
+            with torch.no_grad():
+                _ = model(test_x.float().to(device))
+            
+            g_results = run_architecture_aware_probes(
+                model, test_x, g_concept, params, 
+                activation_store=activation_store, is_regression=False
+            )
+            
+            for h in hooks:
+                h.remove()
+        
         g_probe_results[w] = g_results
         
         print(f"  Probing for f(g(x)) concept...")
-        f_results = analyzer.run_probes(activation_store, test_f_gx, is_regression=True)
-        f_probe_results[w] = f_results
+        if architecture == 'transformer':
+            # Use transformer-specific probing
+            f_results = run_architecture_aware_probes(
+                model, test_x, fg_concept, params, is_regression=False
+            )
+        else:
+            # Use MLP probing with activation capture
+            activation_store = {}
+            hooks = register_architecture_hooks(model, list(range(depth + 1)), activation_store, params)
+            
+            with torch.no_grad():
+                _ = model(test_x.float().to(device))
+            
+            f_results = run_architecture_aware_probes(
+                model, test_x, fg_concept, params, 
+                activation_store=activation_store, is_regression=False
+            )
+            
+            for h in hooks:
+                h.remove()
         
-        for h in hooks:
-            h.remove()
+        f_probe_results[w] = f_results
     
     # Save results
     results = {

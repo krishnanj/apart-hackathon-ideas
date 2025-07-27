@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Symmetry Analysis: Detect when networks learn to treat symmetric inputs identically
+Symmetry analysis with support for both MLP and Transformer
 """
 
 import torch
