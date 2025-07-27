@@ -146,6 +146,6 @@ This work builds on:
 - Grokking phenomenon in neural networks
 - Transformer architecture analysis
 
-## Contributing
-
-This is research code. For questions or contributions, please open an issue or pull request.
+## LICENSE
+Copyright (c) 2025 Jeyashree Krishnan and Ajay Mandyam Rangarajan
+All rights reserved.
