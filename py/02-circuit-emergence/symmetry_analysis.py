@@ -10,7 +10,7 @@ from datetime import datetime
 import os
 from sklearn.metrics.pairwise import euclidean_distances
 from sklearn.manifold import MDS
-import seaborn as sns
+# import seaborn as sns  # Commented out to avoid dependency issues
 
 from model import create_model_from_params
 from dataset import create_dataset_from_params

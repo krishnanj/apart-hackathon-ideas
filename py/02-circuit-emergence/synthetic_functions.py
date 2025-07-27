@@ -16,8 +16,12 @@ class SyntheticFunctionGenerator:
             random.seed(seed)
             np.random.seed(seed)
             
-        # Generate random coefficients
+        # Generate random coefficients with scaling to prevent overflow
         coeffs = np.random.uniform(-2, 2, degree + 1)
+        
+        # Scale coefficients to prevent numerical overflow for high degrees
+        for i in range(degree + 1):
+            coeffs[i] = coeffs[i] / (2.0 ** i)  # More aggressive scaling
         
         # Generate inputs
         x = torch.linspace(self.input_range[0], self.input_range[1], self.n_samples)
@@ -180,4 +184,54 @@ if __name__ == "__main__":
             x, g_x, f_gx = generator.generate_composite(inner, outer, seed=42)
             print(f"Composite {inner}->{outer}: x shape {x.shape}, g(x) shape {g_x.shape}, f(g(x)) shape {f_gx.shape}")
         except Exception as e:
-            print(f"Error with composite {inner}->{outer}: {e}") 
+            print(f"Error with composite {inner}->{outer}: {e}")
+
+# Add these functions to synthetic_functions.py after the existing methods
+
+def generate_complexity_variants(self, func_type: str, complexity_range: List[int], seed: int = None):
+    """Generate functions with varying complexity levels"""
+    variants = {}
+    
+    for complexity in complexity_range:
+        try:
+            x, y = self.generate_dataset(func_type, complexity, seed)
+            variants[complexity] = (x, y)
+        except Exception as e:
+            print(f"Warning: Failed to generate {func_type} with complexity {complexity}: {e}")
+    
+    return variants
+
+def generate_grokking_dataset(self, func_type: str, subset_ratio: float = 0.3, seed: int = None):
+    """Generate subset dataset for grokking experiments"""
+    if seed is not None:
+        random.seed(seed)
+        np.random.seed(seed)
+    
+    # Generate full dataset
+    x, y = self.generate_dataset(func_type, 3, seed)  # Use complexity 3 as default
+    
+    # Create subset
+    n_subset = int(subset_ratio * len(x))
+    indices = torch.randperm(len(x))
+    subset_idx = indices[:n_subset]
+    remaining_idx = indices[n_subset:]
+    
+    return x[subset_idx], y[subset_idx], x[remaining_idx], y[remaining_idx]
+
+def generate_robustness_test_data(self, func_type: str, complexity: int, noise_levels: List[float], seed: int = None):
+    """Generate data with varying noise levels for robustness testing"""
+    if seed is not None:
+        random.seed(seed)
+        np.random.seed(seed)
+    
+    # Generate base dataset
+    x, y = self.generate_dataset(func_type, complexity, seed)
+    
+    # Add noise at different levels
+    noisy_datasets = {}
+    for noise_level in noise_levels:
+        noise = torch.randn_like(y) * noise_level
+        y_noisy = y + noise
+        noisy_datasets[noise_level] = (x, y_noisy)
+    
+    return noisy_datasets 
