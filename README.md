@@ -1,7 +1,11 @@
-# Layerwise Development of Compositional Functional Representations Across Architectures
-
+# Circuit Emergence in Neural Networks
 
 This repository investigates how concepts emerge and become linearly decodable from internal activations as neural networks scale in capacity. We study both Multi-Layer Perceptrons (MLPs) and Transformer architectures to understand how circuit emergence differs between architectures.
+
+## Key Finding: Transformer Learning of Composite Functions
+
+![POLY_SIN Transformer Analysis](py/02-circuit-emergence/plots/poly_sin_focused_analysis_20250727_234709.png)
+*Transformer models achieve near-perfect accuracy (99.9%) on composite functions f(g(x)) while performing extremely poorly (1.7%) on the intermediate function g(x). This reveals that transformers memorize the final output rather than learning the compositional structure, suggesting a fundamental difference in how transformers vs MLPs learn composite functions.*
 
 ## Overview
 
@@ -28,6 +32,7 @@ The project implements 7 key steps for studying circuit emergence:
 - **Attention Analysis**: Self-attention weights reveal concept-specific patterns
 - **Sequence Processing**: Transformers handle discrete tokenized inputs effectively
 - **Modular Arithmetic**: Successfully learn modular addition and division
+- **Composite Function Learning**: Transformers memorize final outputs rather than learning compositional structure
 
 ## Key Visualizations
 
@@ -40,15 +45,15 @@ The project implements 7 key steps for studying circuit emergence:
 *Dual probing results showing how MLPs learn both g(x) and f(g(x)) concepts simultaneously in composite functions.*
 
 ### Transformer Position Embeddings
-![Transformer Position Embeddings](py/02-circuit-emergence/plots/pos_embeddings_vs_complexity_20250727_182702.png)
+![Transformer Position Embeddings](py/02-circuit-emergence/plots/transformers_important_plots/pos_embeddings_vs_complexity_20250727_182702.png)
 *Position embeddings show meaningful concept emergence patterns in transformers, with accuracy peaking at moderate complexity levels.*
 
 ### Transformer Grokking Analysis
-![Transformer Grokking](py/02-circuit-emergence/plots/transformer_grokking_comprehensive_20250727_194004.png)
+![Transformer Grokking](py/02-circuit-emergence/plots/transformers_important_plots/transformer_grokking_comprehensive_20250727_194004.png)
 *Comprehensive analysis of transformer grokking behavior, showing training dynamics and concept development over time.*
 
 ### Transformer vs MLP Comparison
-![All Layers Heatmap](py/02-circuit-emergence/plots/all_layers_heatmap_20250727_182702.png)
+![All Layers Heatmap](py/02-circuit-emergence/plots/transformers_important_plots/all_layers_heatmap_20250727_182702.png)
 *Comparison of concept emergence across all transformer layers, showing how different layers encode information at varying complexity levels.*
 
 ## Technical Details
@@ -147,6 +152,7 @@ This work builds on:
 - Grokking phenomenon in neural networks
 - Transformer architecture analysis
 
-## LICENSE
-Copyright (c) 2025 Jeyashree Krishnan and Ajay Mandyam Rangarajan
-All rights reserved.
+## License
+
+Copyright (c) 2025 Jeyashree Krishnan and Ajay Mandyam Rangarajan All rights reserved.
+
